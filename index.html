@@ -57,6 +57,10 @@
             .icon-incorrect {
                 color: #dc2626; /* red-600 */
             }
+            /* Ngăn người dùng chọn văn bản trên các nút modal */
+            .modal-button {
+                user-select: none;
+            }
         </style>
     </head>
     <body class="bg-blue-50 flex items-center justify-center min-h-screen p-4">
@@ -131,6 +135,25 @@
             </div>
         </div>
 
+        <!-- Modal (popup) cho việc chọn đáp án trên di động -->
+        <div
+            id="choice-modal"
+            class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50"
+        >
+            <div
+                class="bg-white rounded-2xl shadow-2xl p-6 text-center w-full max-w-xs"
+            >
+                <!-- Tiêu đề của modal giờ sẽ hiển thị phép tính -->
+                <h2
+                    id="modal-question"
+                    class="text-3xl font-bold text-purple-600 mb-6"
+                ></h2>
+                <div id="choice-buttons" class="grid grid-cols-2 gap-4">
+                    <!-- Các nút chọn đáp án sẽ được chèn vào đây bằng JavaScript -->
+                </div>
+            </div>
+        </div>
+
         <script>
             // Lấy các phần tử HTML cần thiết
             const tableSelect = document.getElementById("table-select");
@@ -138,54 +161,137 @@
             const checkBtn = document.getElementById("check-btn");
             const newProblemsBtn = document.getElementById("new-problems-btn");
             const messageEl = document.getElementById("message");
+            const choiceModal = document.getElementById("choice-modal");
+            const choiceButtonsContainer =
+                document.getElementById("choice-buttons");
+            const modalQuestionEl = document.getElementById("modal-question");
 
-            const NUM_PROBLEMS = 15; // Cập nhật số lượng bài toán thành 15
+            const NUM_PROBLEMS = 15;
             let problems = [];
 
             /**
-             * Tạo một bộ bài toán mới và hiển thị lên màn hình.
+             * Kiểm tra xem thiết bị có phải là di động hay không.
+             * @returns {boolean} True nếu là di động, ngược lại là false.
+             */
+            function isMobile() {
+                return window.innerWidth < 768;
+            }
+
+            /**
+             * Tạo một bộ bài toán mới và hiển thị lên màn hình, đảm bảo không có phép tính trùng lặp.
              */
             function generateProblems() {
                 const selectedTable = parseInt(tableSelect.value, 10);
                 problemsGrid.innerHTML = "";
                 messageEl.textContent = "";
-                problems = [];
 
-                for (let i = 0; i < NUM_PROBLEMS; i++) {
-                    const isMultiplication = Math.random() < 0.5;
-                    let questionText, correctAnswer;
-
-                    if (isMultiplication) {
-                        const num = Math.floor(Math.random() * 10) + 1;
-                        questionText = `${selectedTable} x ${num} =`;
-                        correctAnswer = selectedTable * num;
-                    } else {
-                        const multiplier = Math.floor(Math.random() * 10) + 1;
-                        const dividend = selectedTable * multiplier;
-                        questionText = `${dividend} ÷ ${selectedTable} =`;
-                        correctAnswer = multiplier;
-                    }
-
-                    problems.push({
-                        question: questionText,
-                        answer: correctAnswer,
+                // 1. Tạo một kho chứa tất cả các phép tính có thể có (10 nhân, 10 chia)
+                const problemPool = [];
+                for (let i = 1; i <= 10; i++) {
+                    // Phép nhân
+                    problemPool.push({
+                        question: `${selectedTable} x ${i} =`,
+                        answer: selectedTable * i,
                     });
+                    // Phép chia
+                    problemPool.push({
+                        question: `${selectedTable * i} ÷ ${selectedTable} =`,
+                        answer: i,
+                    });
+                }
 
+                // 2. Xáo trộn ngẫu nhiên kho phép tính (thuật toán Fisher-Yates)
+                for (let i = problemPool.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [problemPool[i], problemPool[j]] = [
+                        problemPool[j],
+                        problemPool[i],
+                    ];
+                }
+
+                // 3. Lấy 15 phép tính đầu tiên từ kho đã xáo trộn
+                problems = problemPool.slice(0, NUM_PROBLEMS);
+
+                // 4. Hiển thị 15 phép tính đã chọn
+                problems.forEach((problem, i) => {
                     const problemCard = document.createElement("div");
                     problemCard.className =
                         "bg-purple-50 p-4 rounded-lg shadow flex flex-col items-center justify-center";
 
-                    // Thêm một div để chứa input và icon
                     problemCard.innerHTML = `
-                    <p class="text-xl md:text-2xl font-bold text-gray-800 mb-2">${questionText}</p>
+                    <p class="text-xl md:text-2xl font-bold text-gray-800 mb-2">${problem.question}</p>
                     <div class="flex items-center">
                         <input type="number" data-index="${i}" class="answer-input text-xl md:text-2xl text-center w-20 md:w-24 p-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-purple-500">
-                        <span class="feedback-icon"></span> <!-- Placeholder cho icon -->
+                        <span class="feedback-icon"></span>
                     </div>
                 `;
 
                     problemsGrid.appendChild(problemCard);
+
+                    // Lấy thẻ input vừa tạo để thêm sự kiện
+                    const inputEl = problemCard.querySelector(".answer-input");
+                    if (isMobile()) {
+                        // Trên di động: không cho nhập, chỉ cho click để mở modal
+                        inputEl.setAttribute("readonly", true);
+                        inputEl.addEventListener("click", (event) => {
+                            event.preventDefault();
+                            const index = parseInt(inputEl.dataset.index, 10);
+                            const currentProblem = problems[index];
+                            showChoiceModal(
+                                inputEl,
+                                currentProblem.answer,
+                                currentProblem.question
+                            );
+                        });
+                    }
+                });
+            }
+
+            /**
+             * Hiển thị modal với các lựa chọn đáp án.
+             * @param {HTMLElement} targetInput - Ô input cần điền giá trị.
+             * @param {number} correctAnswer - Đáp án đúng.
+             * @param {string} questionText - Phép tính đang được hỏi.
+             */
+            function showChoiceModal(targetInput, correctAnswer, questionText) {
+                // Hiển thị phép tính trong tiêu đề của modal
+                modalQuestionEl.textContent = questionText;
+                choiceButtonsContainer.innerHTML = ""; // Xóa các nút cũ
+
+                // Tạo tập hợp các đáp án, bao gồm đáp án đúng và 3 đáp án sai
+                const choices = new Set([correctAnswer]);
+                while (choices.size < 4) {
+                    const offset = Math.floor(Math.random() * 5) + 1; // Tạo số ngẫu nhiên từ 1-5
+                    const distractor =
+                        Math.random() < 0.5
+                            ? correctAnswer + offset
+                            : correctAnswer - offset;
+                    if (distractor >= 0 && distractor !== correctAnswer) {
+                        // Đảm bảo đáp án sai khác đáp án đúng và không âm
+                        choices.add(distractor);
+                    }
                 }
+
+                // Xáo trộn các đáp án
+                const shuffledChoices = Array.from(choices).sort(
+                    () => Math.random() - 0.5
+                );
+
+                // Tạo nút cho từng đáp án
+                shuffledChoices.forEach((choice) => {
+                    const button = document.createElement("button");
+                    button.className =
+                        "modal-button bg-purple-500 text-white font-bold text-2xl p-4 rounded-lg shadow-md btn-hover";
+                    button.textContent = choice;
+                    button.addEventListener("click", () => {
+                        targetInput.value = choice;
+                        choiceModal.classList.add("hidden");
+                    });
+                    choiceButtonsContainer.appendChild(button);
+                });
+
+                // Hiển thị modal
+                choiceModal.classList.remove("hidden");
             }
 
             /**
@@ -199,25 +305,20 @@
                     const index = parseInt(input.dataset.index, 10);
                     const userAnswer = parseInt(input.value, 10);
                     const correctAnswer = problems[index].answer;
-
-                    // Tìm icon tương ứng bên cạnh input
                     const icon = input.nextElementSibling;
 
-                    // Đặt lại trạng thái
                     input.classList.remove("correct", "incorrect");
                     icon.textContent = "";
                     icon.className = "feedback-icon";
 
                     if (!isNaN(userAnswer) && userAnswer === correctAnswer) {
-                        // Nếu trả lời đúng
                         input.classList.add("correct");
-                        icon.textContent = "✓"; // Dấu tick
+                        icon.textContent = "✓";
                         icon.classList.add("icon-correct");
                         correctCount++;
                     } else {
-                        // Nếu trả lời sai hoặc không trả lời
                         input.classList.add("incorrect");
-                        icon.textContent = "✗"; // Dấu chéo
+                        icon.textContent = "✗";
                         icon.classList.add("icon-incorrect");
                     }
                 });
@@ -238,6 +339,13 @@
             checkBtn.addEventListener("click", checkAnswers);
             newProblemsBtn.addEventListener("click", generateProblems);
             tableSelect.addEventListener("change", generateProblems);
+
+            // Đóng modal khi click ra ngoài vùng chọn
+            choiceModal.addEventListener("click", (event) => {
+                if (event.target === choiceModal) {
+                    choiceModal.classList.add("hidden");
+                }
+            });
 
             // Tải bộ bài toán đầu tiên khi trang được mở
             window.onload = generateProblems;
