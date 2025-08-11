@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="vi">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Ôn tập Bảng Cửu Chương</title>
+        <!-- Sử dụng Tailwind CSS để giao diện đẹp hơn -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        <!-- Sử dụng Google Fonts cho font chữ thân thiện -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;700&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            /* Tùy chỉnh font chữ cho toàn bộ trang */
+            body {
+                font-family: "Baloo 2", cursive;
+            }
+            /* Hiệu ứng khi di chuột vào nút */
+            .btn-hover:hover {
+                transform: scale(1.05);
+            }
+            /* Kiểu cho input */
+            .answer-input {
+                transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+            }
+            /* Kiểu cho câu trả lời ĐÚNG */
+            .correct {
+                border-color: #16a34a; /* green-600 */
+                background-color: #dcfce7; /* green-100 */
+                color: #15803d; /* green-700 */
+                font-weight: bold;
+            }
+            /* Kiểu cho câu trả lời SAI */
+            .incorrect {
+                border-color: #dc2626; /* red-600 */
+                background-color: #fee2e2; /* red-100 */
+                color: #b91c1c; /* red-700 */
+                font-weight: bold;
+            }
+            /* Kiểu cho icon phản hồi (dấu tick và dấu chéo) */
+            .feedback-icon {
+                font-size: 1.75rem; /* Tăng kích thước icon */
+                font-weight: bold;
+                line-height: 1;
+                width: 2rem; /* Dành không gian cho icon */
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                margin-left: 0.5rem;
+            }
+            .icon-correct {
+                color: #16a34a; /* green-600 */
+            }
+            .icon-incorrect {
+                color: #dc2626; /* red-600 */
+            }
+        </style>
+    </head>
+    <body class="bg-blue-50 flex items-center justify-center min-h-screen p-4">
+        <div
+            class="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl p-6 md:p-8 text-center border-4 border-purple-400"
+        >
+            <!-- Tiêu đề -->
+            <h1 class="text-3xl md:text-4xl font-bold text-purple-600 mb-2">
+                Bé Vui Học Toán
+            </h1>
+            <p class="text-gray-500 mb-6">
+                Hãy hoàn thành các phép tính dưới đây nhé!
+            </p>
+
+            <!-- Bộ lọc chọn bảng cửu chương -->
+            <div
+                class="mb-6 flex flex-col sm:flex-row items-center justify-center gap-2"
+            >
+                <label
+                    for="table-select"
+                    class="text-xl font-semibold text-gray-700"
+                    >Chọn bảng cửu chương:</label
+                >
+                <select
+                    id="table-select"
+                    class="text-lg p-2 border-2 border-purple-300 rounded-lg focus:border-purple-500 focus:ring-purple-500"
+                >
+                    <option value="1">Bảng 1</option>
+                    <option value="2">Bảng 2</option>
+                    <option value="3" selected>Bảng 3</option>
+                    <option value="4">Bảng 4</option>
+                    <option value="5">Bảng 5</option>
+                    <option value="6">Bảng 6</option>
+                    <option value="7">Bảng 7</option>
+                    <option value="8">Bảng 8</option>
+                    <option value="9">Bảng 9</option>
+                </select>
+            </div>
+
+            <!-- Khu vực hiển thị các phép toán (responsive) -->
+            <div
+                id="problems-grid"
+                class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 my-6"
+            >
+                <!-- Các bài toán sẽ được tạo ở đây -->
+            </div>
+
+            <!-- Các nút hành động -->
+            <div
+                class="flex flex-col sm:flex-row items-center justify-center gap-4"
+            >
+                <button
+                    id="check-btn"
+                    class="w-full sm:w-auto bg-green-500 text-white font-bold text-xl px-8 py-4 rounded-lg shadow-md transition-transform duration-200 btn-hover"
+                >
+                    Kiểm tra kết quả
+                </button>
+                <button
+                    id="new-problems-btn"
+                    class="w-full sm:w-auto bg-purple-500 text-white font-bold text-xl px-8 py-4 rounded-lg shadow-md transition-transform duration-200 btn-hover"
+                >
+                    Làm bài mới
+                </button>
+            </div>
+
+            <!-- Khu vực hiển thị thông báo -->
+            <div class="mt-6">
+                <div
+                    id="message"
+                    class="h-10 text-2xl font-semibold transition-all duration-300"
+                ></div>
+            </div>
+        </div>
+
+        <script>
+            // Lấy các phần tử HTML cần thiết
+            const tableSelect = document.getElementById("table-select");
+            const problemsGrid = document.getElementById("problems-grid");
+            const checkBtn = document.getElementById("check-btn");
+            const newProblemsBtn = document.getElementById("new-problems-btn");
+            const messageEl = document.getElementById("message");
+
+            const NUM_PROBLEMS = 15; // Cập nhật số lượng bài toán thành 15
+            let problems = [];
+
+            /**
+             * Tạo một bộ bài toán mới và hiển thị lên màn hình.
+             */
+            function generateProblems() {
+                const selectedTable = parseInt(tableSelect.value, 10);
+                problemsGrid.innerHTML = "";
+                messageEl.textContent = "";
+                problems = [];
+
+                for (let i = 0; i < NUM_PROBLEMS; i++) {
+                    const isMultiplication = Math.random() < 0.5;
+                    let questionText, correctAnswer;
+
+                    if (isMultiplication) {
+                        const num = Math.floor(Math.random() * 10) + 1;
+                        questionText = `${selectedTable} x ${num} =`;
+                        correctAnswer = selectedTable * num;
+                    } else {
+                        const multiplier = Math.floor(Math.random() * 10) + 1;
+                        const dividend = selectedTable * multiplier;
+                        questionText = `${dividend} ÷ ${selectedTable} =`;
+                        correctAnswer = multiplier;
+                    }
+
+                    problems.push({
+                        question: questionText,
+                        answer: correctAnswer,
+                    });
+
+                    const problemCard = document.createElement("div");
+                    problemCard.className =
+                        "bg-purple-50 p-4 rounded-lg shadow flex flex-col items-center justify-center";
+
+                    // Thêm một div để chứa input và icon
+                    problemCard.innerHTML = `
+                    <p class="text-xl md:text-2xl font-bold text-gray-800 mb-2">${questionText}</p>
+                    <div class="flex items-center">
+                        <input type="number" data-index="${i}" class="answer-input text-xl md:text-2xl text-center w-20 md:w-24 p-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-purple-500">
+                        <span class="feedback-icon"></span> <!-- Placeholder cho icon -->
+                    </div>
+                `;
+
+                    problemsGrid.appendChild(problemCard);
+                }
+            }
+
+            /**
+             * Kiểm tra tất cả các câu trả lời và hiển thị phản hồi.
+             */
+            function checkAnswers() {
+                const inputs = document.querySelectorAll(".answer-input");
+                let correctCount = 0;
+
+                inputs.forEach((input) => {
+                    const index = parseInt(input.dataset.index, 10);
+                    const userAnswer = parseInt(input.value, 10);
+                    const correctAnswer = problems[index].answer;
+
+                    // Tìm icon tương ứng bên cạnh input
+                    const icon = input.nextElementSibling;
+
+                    // Đặt lại trạng thái
+                    input.classList.remove("correct", "incorrect");
+                    icon.textContent = "";
+                    icon.className = "feedback-icon";
+
+                    if (!isNaN(userAnswer) && userAnswer === correctAnswer) {
+                        // Nếu trả lời đúng
+                        input.classList.add("correct");
+                        icon.textContent = "✓"; // Dấu tick
+                        icon.classList.add("icon-correct");
+                        correctCount++;
+                    } else {
+                        // Nếu trả lời sai hoặc không trả lời
+                        input.classList.add("incorrect");
+                        icon.textContent = "✗"; // Dấu chéo
+                        icon.classList.add("icon-incorrect");
+                    }
+                });
+
+                // Hiển thị thông báo kết quả tổng kết
+                if (correctCount === NUM_PROBLEMS) {
+                    messageEl.textContent = `Tuyệt vời! Bạn đã đúng tất cả ${NUM_PROBLEMS} câu! 🌟`;
+                    messageEl.className =
+                        "h-10 text-2xl font-semibold text-green-500";
+                } else {
+                    messageEl.textContent = `Bạn đã làm đúng ${correctCount}/${NUM_PROBLEMS} câu. Cố lên nhé!`;
+                    messageEl.className =
+                        "h-10 text-2xl font-semibold text-orange-500";
+                }
+            }
+
+            // Gán sự kiện cho các nút và bộ lọc
+            checkBtn.addEventListener("click", checkAnswers);
+            newProblemsBtn.addEventListener("click", generateProblems);
+            tableSelect.addEventListener("change", generateProblems);
+
+            // Tải bộ bài toán đầu tiên khi trang được mở
+            window.onload = generateProblems;
+        </script>
+    </body>
+</html>
